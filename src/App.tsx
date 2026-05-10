@@ -38,6 +38,7 @@ function App() {
   const evaluations = useMemo(() => getPlayerEvaluations(state), [state]);
   const winnerIds = useMemo(() => getWinnerIds(state), [state]);
   const canAdvance = state.street !== 'finished';
+  const revealedCards = state.communityCards.length;
 
   function newGame(nextPlayerCount = playerCount) {
     setState(startSingleMatch(nextPlayerCount));
@@ -49,21 +50,21 @@ function App() {
   }
 
   return (
-    <main className="min-h-screen bg-slate-50 text-slate-950">
-      <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-6 sm:px-6 lg:px-8">
-        <header className="flex flex-col gap-4 border-b border-slate-200 pb-5 sm:flex-row sm:items-end sm:justify-between">
+    <main className="casino-shell min-h-screen text-stone-50">
+      <div className="mx-auto flex w-full max-w-7xl flex-col gap-5 px-4 py-5 sm:px-6 lg:px-8">
+        <header className="casino-topbar">
           <div>
-            <p className="text-sm font-semibold uppercase tracking-wide text-emerald-700">
+            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-amber-300">
               Single Match
             </p>
-            <h1 className="mt-1 text-3xl font-bold">All-in Poker Equity</h1>
+            <h1 className="mt-1 text-3xl font-bold text-white sm:text-4xl">All-in Poker Equity</h1>
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
-            <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
+            <label className="casino-select-label">
               Players
               <select
-                className="h-10 rounded-md border border-slate-300 bg-white px-3 text-slate-950 shadow-sm"
+                className="casino-select"
                 value={playerCount}
                 onChange={(event) => handlePlayerCountChange(Number(event.target.value))}
               >
@@ -80,84 +81,92 @@ function App() {
           </div>
         </header>
 
-        <section className="grid gap-5 lg:grid-cols-[1fr_280px]">
-          <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <p className="text-sm text-slate-500">Street</p>
-                <h2 className="text-2xl font-semibold">{streetLabels[state.street]}</h2>
-              </div>
-              <button
-                className="primary-button disabled:cursor-not-allowed disabled:bg-slate-300"
-                type="button"
-                disabled={!canAdvance}
-                onClick={() => setState((current) => advanceStreet(current))}
-              >
-                {state.street === 'river' ? 'Show Result' : 'Next'}
-              </button>
+        <section className="casino-statusbar">
+          <div className="status-item">
+            <span>Street</span>
+            <h2>{streetLabels[state.street]}</h2>
+          </div>
+          <div className="status-item">
+            <span>Board</span>
+            <strong>{revealedCards}/5</strong>
+          </div>
+          <div className="status-item">
+            <span>Monte Carlo</span>
+            <strong>800</strong>
+          </div>
+          {state.street === 'finished' && (
+            <div className="winner-banner">
+              <span>Winner</span>
+              <strong>{winnerIds.map((id) => `Player ${id}`).join(' / ')}</strong>
             </div>
+          )}
+          <button
+            className="primary-button disabled:cursor-not-allowed disabled:opacity-50"
+            type="button"
+            disabled={!canAdvance}
+            onClick={() => setState((current) => advanceStreet(current))}
+          >
+            {state.street === 'river' ? 'Show Result' : 'Next'}
+          </button>
+        </section>
 
-            <div className="community-area">
-              {Array.from({ length: 5 }, (_, index) => (
-                <CardView key={index} card={state.communityCards[index]} muted={!state.communityCards[index]} />
-              ))}
+        <section className="poker-layout">
+          <div className="table-stage">
+            <div className="poker-table">
+              <div className="table-felt">
+                <div className="dealer-mark">BOARD</div>
+                <div className="community-area">
+                  {Array.from({ length: 5 }, (_, index) => (
+                    <CardView
+                      key={index}
+                      card={state.communityCards[index]}
+                      muted={!state.communityCards[index]}
+                    />
+                  ))}
+                </div>
+                <div className="table-caption">
+                  未公開カードを補完して、各プレイヤーの現在勝率を計算します。
+                </div>
+              </div>
             </div>
           </div>
 
-          <aside className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-            <p className="text-sm text-slate-500">Monte Carlo</p>
-            <p className="mt-1 text-3xl font-semibold">800</p>
-            <p className="mt-2 text-sm leading-6 text-slate-600">
-              未公開カードを補完して、各プレイヤーの現在勝率を計算します。
-            </p>
-            {state.street === 'finished' && (
-              <div className="mt-5 rounded-md bg-emerald-50 p-4 text-emerald-950">
-                <p className="text-sm font-semibold">Winner</p>
-                <p className="mt-1 text-lg font-bold">
-                  {winnerIds.map((id) => `Player ${id}`).join(' / ')}
-                </p>
-              </div>
-            )}
-          </aside>
-        </section>
+          <section className="seats-grid">
+            {state.players.map((player) => {
+              const equity = equities.find((item) => item.playerId === player.id)?.equity ?? 0;
+              const evaluation = evaluations.get(player.id);
+              const isWinner = winnerIds.includes(player.id) && state.street === 'finished';
 
-        <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {state.players.map((player) => {
-            const equity = equities.find((item) => item.playerId === player.id)?.equity ?? 0;
-            const evaluation = evaluations.get(player.id);
-            const isWinner = winnerIds.includes(player.id) && state.street === 'finished';
+              return (
+                <article className={`player-seat ${isWinner ? 'winner-seat' : ''}`} key={player.id}>
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="seat-label">Seat {player.id}</p>
+                      <h3 className="text-lg font-semibold text-white">{player.name}</h3>
+                    </div>
+                    <span className="equity-chip">{equity.toFixed(1)}%</span>
+                  </div>
 
-            return (
-              <article
-                className={`player-panel ${isWinner ? 'border-emerald-500 bg-emerald-50' : ''}`}
-                key={player.id}
-              >
-                <div className="flex items-center justify-between gap-3">
-                  <h3 className="text-lg font-semibold">{player.name}</h3>
-                  <span className="rounded-full bg-slate-100 px-3 py-1 text-sm font-semibold text-slate-700">
-                    {equity.toFixed(1)}%
-                  </span>
-                </div>
+                  <div className="mt-4 flex gap-3">
+                    {player.holeCards.map((card) => (
+                      <CardView key={cardLabel(card)} card={card} />
+                    ))}
+                  </div>
 
-                <div className="mt-4 flex gap-3">
-                  {player.holeCards.map((card) => (
-                    <CardView key={cardLabel(card)} card={card} />
-                  ))}
-                </div>
-
-                <div className="mt-4 min-h-12 border-t border-slate-200 pt-3">
-                  {evaluation ? (
-                    <>
-                      <p className="text-sm text-slate-500">Final hand</p>
-                      <p className="font-semibold">{handLabels[evaluation.category]}</p>
-                    </>
-                  ) : (
-                    <p className="text-sm text-slate-500">Riverで最終役を表示</p>
-                  )}
-                </div>
-              </article>
-            );
-          })}
+                  <div className="seat-footer">
+                    {evaluation ? (
+                      <>
+                        <p>Final hand</p>
+                        <strong>{handLabels[evaluation.category]}</strong>
+                      </>
+                    ) : (
+                      <p>Riverで最終役を表示</p>
+                    )}
+                  </div>
+                </article>
+              );
+            })}
+          </section>
         </section>
       </div>
     </main>
@@ -166,15 +175,15 @@ function App() {
 
 function CardView({ card, muted = false }: { card?: Card; muted?: boolean }) {
   if (!card) {
-    return <div className="playing-card border-dashed text-slate-300">{muted ? '?' : ''}</div>;
+    return <div className="playing-card empty-card">{muted ? '?' : ''}</div>;
   }
 
   const isRed = card.suit === 'hearts' || card.suit === 'diamonds';
 
   return (
-    <div className={`playing-card ${isRed ? 'text-rose-600' : 'text-slate-950'}`}>
-      <span className="text-xl font-bold">{rankLabel(card.rank)}</span>
-      <span className="text-2xl leading-none">{suitLabel(card.suit)}</span>
+    <div className={`playing-card ${isRed ? 'red-card' : 'black-card'}`}>
+      <span className="card-rank">{rankLabel(card.rank)}</span>
+      <span className="card-suit">{suitLabel(card.suit)}</span>
     </div>
   );
 }
